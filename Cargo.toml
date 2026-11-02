@@ -1,0 +1,36 @@
+[package]
+name = "packet-cage"
+version = "0.2.0"
+edition = "2024"
+description = "Packet-capture diagnostics with an experimental Linux sandbox"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/rajveer100704/packet-cage"
+keywords = ["pcap", "network", "sandbox", "seccomp", "diagnostics"]
+categories = ["command-line-utilities", "network-programming"]
+exclude = [".github", "action.yml", "dist-workspace.toml"]
+
+[dependencies]
+anstream = "1.0.0"
+anstyle = "1.0.14"
+anyhow = "1.0.104"
+clap = { version = "4.6.7", features = ["derive"] }
+ctrlc = { version = "3.5.2", features = ["termination"] }
+libloading = "0.9.0"
+libc = "0.2.190"
+regex-lite = "0.1.9"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libseccomp = "0.4.0"
+
+[dev-dependencies]
+serde_json = "1.0.151"
+
+[profile.release]
+lto = true
+codegen-units = 1
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"

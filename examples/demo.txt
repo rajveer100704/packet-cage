@@ -1,0 +1,10 @@
+examples/demo.pcap: 314 packets over 8.19 s, from 2025-10-09 08:53:20.000 UTC
+
+✗ DNS   api.internal: name does not exist (NXDOMAIN, asked 3 times)             frames 41-42, 134
+✗ TLS   pay.example.com:443: client rejected the handshake: unknown_ca (the certificate's issuer is not trusted)  frame 84
+        → usually a private CA, or a TLS-inspecting proxy whose CA the client does not have
+⚠ SLOW  api.example.com:443: network RTT 40.0 ms, server took 2.10 s to answer  frames 114-166
+        → the server is slow, not the network
+⚠ LOSS  10.0.0.5 → cdn.example.com:443: 7.4% of segments retransmitted (4 of 54), mostly by the server  frames 206-261
+        → the capture saw the first copies, so packets were lost between the capture point and the client
+✓ 11 other connections look healthy
