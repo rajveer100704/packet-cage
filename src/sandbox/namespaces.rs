@@ -42,7 +42,8 @@ const NAMESPACE_OPTIONS: &[&str] = &[
 /// - a private mount-propagation tree;
 /// - parent-death handling for the namespace child.
 ///
-/// This does not yet restrict filesystem visibility or install seccomp.
+/// This helper establishes namespaces only. The sandbox worker separately
+/// configures the private root filesystem and installs the seccomp policy.
 pub fn spawn_namespaced_in_cgroup<I, S>(
     job: &JobCgroup,
     program: impl AsRef<OsStr>,

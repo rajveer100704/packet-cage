@@ -28,7 +28,7 @@ Who it's for: support engineers handed a customer's capture, backend developers 
 - **Never crash on bad input.** Captures are untrusted, often cut off, often snaplen-truncated. Decode what is there, say what isn't.
 - **Offline first.** Reading files needs no libpcap/Npcap and no admin rights. Live capture is an optional extra.
 - **Wireshark is the answer key.** Every detector is checked against tshark on real captures; where we differ on purpose, the docs say why.
-- **One binary per OS**, no runtime dependencies.
+- **One binary per OS.** Core offline capture reading has no libpcap/Npcap dependency; live capture loads libpcap/Npcap at runtime, and the Linux sandbox dynamically links libseccomp.
 
 ## CLI
 
@@ -42,6 +42,7 @@ Who it's for: support engineers handed a customer's capture, backend developers 
 | `packet-cage fields` | the fields filters can use | M7 |
 | `packet-cage live [-i IFACE] [-d 30s] [-w out.pcapng]` | capture, then diagnose | M8 |
 | `packet-cage interfaces` | what `live` can capture on | M8 |
+| `packet-cage sandbox run --cgroup-root PATH FILE` | isolated Linux analysis with resource limits and timeout cleanup | M10 |
 
 Exit codes: 0 ok, 1 `check` found problems, 2 error.
 
@@ -56,6 +57,8 @@ analyze/   TCP health, DNS, TLS, HTTP detectors                  (M3-M5)
 diagnose/  rules over the analysis                               -> Finding { severity, category, text, frames, measurements, filter }  (M6)
 report/    text / JSON / HTML                                    (M6)
 filter/    tokenizer -> parser -> AST -> evaluator               (M7)
+sandbox/   cgroup v2, gated launch, timeout, namespaces, private
+           rootfs/filesystems and seccomp (Linux only)            (M10)
 ```
 
 Decoding borrows the frame bytes (zero-copy). When a layer is malformed, the layers before it are kept, like Wireshark's "[Malformed Packet]".
@@ -190,18 +193,34 @@ Cargo project, CLI skeleton, CI (fmt, clippy, tests on Linux, Windows and macOS)
   - Without `-i` it picks the interface the default route goes through: connecting a UDP socket picks a route without sending anything.
   - Tested on Linux (WSL 2, libpcap 1.10.4): loopback and Ethernet, BPF filters, `-c`, `-d`, Ctrl-C and SIGTERM, a missing interface, no root. On a lossy capture (netem, 2,438 frames) every field matches tshark except `http`, where Wireshark marks body frames as continuations (a difference listed in M7). CI captures on Linux and macOS loopback on every push, and on Linux compares the analysis flags of a lossy transfer with tshark. Windows is tested only without Npcap: its installer has no silent mode outside the paid edition, so CI can't install it.
 
-### M9 Release — done 2026-10-14
+### M9 Release pipeline foundation — done 2026-10-14
 - cargo-dist: binaries for Windows, Linux and macOS, `cargo install`, maybe Scoop and Homebrew
 - README: before/after (Wireshark screenshot next to packet-cage output), sample captures, notes on where we differ from tshark
 - Launch posts built around a real debugging story (r/networking, r/sysadmin, Show HN)
 - **Status:**
-  - Pushing a `v*` tag builds a release with cargo-dist 0.33 (`dist-workspace.toml`, `.github/workflows/release.yml`): binaries for Linux (x86_64 and ARM64), macOS (Intel and Apple silicon) and Windows (x86_64), checksums, and install scripts for the shell and PowerShell. v0.1.0 is the first.
+  - Pushing a `v*` tag builds a release with cargo-dist 0.33 (`dist-workspace.toml`, `.github/workflows/release.yml`): binaries for Linux (x86_64 and ARM64), macOS (Intel and Apple silicon) and Windows (x86_64), checksums, and install scripts for the shell and PowerShell. The original analyzer release baseline was v0.1.0; PacketCage v0.2.0 is recorded in M11.
   - Linux binaries link glibc rather than being static musl builds, because a static binary can't load libpcap at run time.
-  - The GitHub Action downloads the release's binary when pinned to a tag (`@v0.1.0`), after checking its checksum, and builds from source otherwise.
+  - In the original release baseline, the GitHub Action downloaded a release binary when pinned to a tag such as `@v0.1.0`, after checking its checksum, and built from source otherwise. PacketCage consumers should pin to `@v0.2.0` (M11).
   - Checked after the release: both install scripts (Windows and Linux in WSL); the Linux binary isn't linked to libpcap and still captures live with the system's; CI runs the released action on Linux, macOS and Windows runners, where it downloads and checks the binary in about a second instead of building for a minute.
-  - The crate is ready for crates.io (`cargo publish --dry-run` passes, CI files left out); publishing needs the owner's token, so `cargo install packet-cage` waits for that. `cargo install --git` works now.
+  - Crate packaging passes `cargo publish --dry-run`, but a crates.io package has not been published. Until then, use the GitHub release installers or `cargo install --git https://github.com/rajveer100704/packet-cage.git`.
   - The README's before/after uses Wireshark's Expert Information as text (`tshark -z expert`) rather than a screenshot: for the demo capture it has no errors or warnings, only notes and chats. The differences from tshark and the sample captures have their own sections.
   - Not done: Scoop and Homebrew need a bucket and a tap repository of their own; worth doing when someone asks. The launch posts are not posted yet; they should come from the author.
+
+### M10 Linux sandbox execution — implemented 2026-11-02
+- `packet-cage sandbox run --cgroup-root PATH FILE` runs analysis inside a Linux-only isolated worker.
+- cgroup v2 controls CPU quota, memory and process count; a wall-clock deadline terminates the workload.
+- A gated launcher attaches the worker to its cgroup before releasing it. Timeout and abnormal-exit cleanup terminate descendants and remove workload cgroups.
+- The worker uses user, mount, PID, network, IPC and UTS namespaces.
+- A private temporary root filesystem stages the capture into a separate read-only input mount. A seccomp default-deny policy is installed for the analysis process.
+- Added sandbox CLI coverage, filesystem/rootfs/seccomp/timeout smoke examples, a cgroup runtime integration test and `docs/SANDBOX.md`.
+- **Validation:** local formatting, Clippy and test suites pass; runtime checks (DNS, HTTP, TCP, TLS, malformed input, timeout cleanup and a real namespaced cgroup worker) have been exercised in WSL2. Cross-platform CI builds/tests the supported targets.
+- **Limitations:** runtime validation in this project has been performed in WSL2. Native Linux validation and independent security review remain outstanding. The sandbox is experimental and is not a hardened multi-tenant security boundary.
+
+### M11 PacketCage v0.2.0 release — published 2026-11-02
+- Published the independently maintained PacketCage package and CLI as version `0.2.0`.
+- Automated `cargo-dist` release for Linux x86_64/ARM64, macOS Intel/Apple silicon and Windows x86_64, with shell/PowerShell installers and SHA-256 checksums.
+- The GitHub Action is available as `rajveer100704/packet-cage@v0.2.0`; pin action consumers to a release tag for reproducible builds.
+- Linux release binaries dynamically link `libseccomp.so.2`, so Debian/Ubuntu systems need the `libseccomp2` runtime package even when using non-sandbox commands. Building on Linux requires `libseccomp-dev` and `pkg-config`. Live capture separately loads libpcap/Npcap at runtime.
 
 ### Later, only if users ask
 IP reassembly, QUIC (SNI from Initial packets), HTTP/2, port-scan and DNS-tunnel detection, process names for live capture, Windows interface names ("Wi-Fi") in `interfaces`, live capture through pktmon when Npcap is missing, `--explain` through an LLM.

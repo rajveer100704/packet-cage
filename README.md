@@ -45,9 +45,26 @@ The sandbox command is Linux-only. Other PacketCage commands remain available on
 
 ## Install
 
-PacketCage is currently intended to be built from source. Prebuilt releases will be published through this repository once available.
+### Linux and macOS
 
-Clone this repository and build:
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf \
+  https://github.com/rajveer100704/packet-cage/releases/latest/download/packet-cage-installer.sh | sh
+```
+
+### Windows (PowerShell)
+
+```powershell
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/rajveer100704/packet-cage/releases/latest/download/packet-cage-installer.ps1 | iex"
+```
+
+Linux release binaries dynamically link to `libseccomp.so.2`. On Debian or Ubuntu, install the `libseccomp2` runtime library with:
+
+```bash
+sudo apt-get install -y libseccomp2
+```
+
+### Build from source
 
 ```bash
 git clone https://github.com/rajveer100704/packet-cage.git
@@ -55,7 +72,7 @@ cd packet-cage
 cargo build --release
 ```
 
-On Debian or Ubuntu, install the Linux sandbox dependencies first, as described in the Linux sandbox section above.
+For Linux sandbox development, install the build dependencies listed in the [Linux sandbox section](#linux-sandbox-experimental), including `libseccomp-dev` and `pkg-config`. Live capture additionally loads the system's libpcap or Npcap at runtime.
 
 
 ## Usage
@@ -177,13 +194,13 @@ packet-cage check capture.pcap \
 In GitHub Actions:
 
 ```yaml
-- uses: rajveer100704/packet-cage@main
+- uses: rajveer100704/packet-cage@v0.2.0
   with:
     captures: captures/*.pcapng
     fail-on: finding.severity == error
 ```
 
-Each finding becomes an annotation on the run, and the report goes to the job summary. Pinned to a release, the action downloads that release's binary; `@main` builds from source, which takes about a minute.
+Each finding becomes an annotation on the run, and the report goes to the job summary. A version-pinned action downloads and verifies that release's binary. Use `@main` during development to build from source, which takes about a minute.
 
 ## Live capture
 

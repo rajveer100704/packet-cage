@@ -1,7 +1,8 @@
 //! Linux sandboxing primitives.
 //!
-//! This module is Linux-only. It starts with cgroup v2 resource controls;
-//! process and namespace isolation are added in later stages.
+//! This module is Linux-only. It combines cgroup v2 resource controls,
+//! gated process launch and timeout handling, namespace isolation, private
+//! filesystem/rootfs setup, and seccomp filtering.
 
 pub mod cgroup;
 

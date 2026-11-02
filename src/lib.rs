@@ -1,5 +1,6 @@
-//! packet-cage reads packet captures and explains what went wrong on the
-//! network. See PLAN.md for where this is going.
+//! PacketCage reads packet captures and explains what went wrong on the
+//! network. Linux also provides an optional isolated execution mode through
+//! the sandbox module.
 
 pub mod analyze;
 pub mod capture;
